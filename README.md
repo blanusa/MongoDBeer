@@ -1,5 +1,6 @@
 # MongoDBeer
- Creating and optimizing queries in MongoDB database
+ Creating and optimizing queries in MongoDB database.
+ 
 This project focuses on creating and optimizing queries on a MongoDB database that contains reviews of various beers. The goal is to efficiently retrieve and manipulate data from the database to provide insights, statistics, and analysis of beer reviews.
 
 Features
