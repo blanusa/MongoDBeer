@@ -1,0 +1,359 @@
+// Пронађи пива која имају више од 10 рецензија и просечну оцену мању од 2, сортирај по нивоу алкохола који поседују 00:01:691
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $group: {
+      _id: {
+        beer_name: "$beer_name",
+        beer_abv: "$beer_ABV"
+      },
+      avg_rating: { $avg: "$review_overall" },
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $match: {
+      count: { $gt: 10 },
+      avg_rating: { $lt: 2 }
+    }
+  },
+  {
+    $sort: { "_id.beer_abv": 1 }
+  },
+  {
+    $project: {
+      _id: 0,
+      beer_name: "$_id.beer_name",
+      avg_rating: 1,
+      count: 1,
+      beer_abv: "$_id.beer_abv"
+    }
+  }
+]).pretty();
+
+
+
+
+//​ Пронађи најбоље оцењена пива по стиловима 00:03:895
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      beer_style: { $ne: null },
+      review_taste: { $gt: 0 }
+    }
+  },
+  {
+    $group: {
+      _id: "$beer_style",
+      avg_taste_rating: { $avg: "$review_taste" },
+      max_taste_rating: { $max: "$review_taste" }, 
+      beers: {
+        $push: {
+          beer_name: "$beer_name",
+          beer_ABV: "$beer_ABV",
+          review_taste: "$review_taste",
+          review_profileName: "$review_profileName"
+        }
+      }
+    }
+  },
+  {
+    $sort: { avg_taste_rating: -1 }
+  },
+  {
+    $project: {
+      _id: 0,
+      beer_style: "$_id",
+      avg_taste_rating: { $round: ["$avg_taste_rating", 1] },
+      max_taste_rating: "$max_taste_rating",
+      top_beer: {
+        $arrayElemAt: [
+          {
+            $filter: {
+              input: "$beers",
+              cond: { $eq: ["$$this.review_taste", "$max_taste_rating"] }
+            }
+          },
+          0
+        ]
+      }
+    }
+  }
+]).pretty();
+
+
+
+
+
+
+//Израчунај просечне оцене рецензената који су написали најмање 5 рецензија 00:00:677
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  { $group: {
+    _id: "$review_profileName",
+    avg_overall: { $avg: "$review_overall" },
+    review_count: { $sum: 1 }
+  }},
+  { $match: { review_count: { $gte: 5 } } },
+  { $sort: { avg_overall: -1 } }
+]);
+
+
+
+
+// Прикажи просечне оцене за све стиловe пива и сортирај их од најбоље до најлошије оцењених 00:00:499
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  { $group: {
+    _id: "$beer_style",
+    avg_overall: { $avg: "$review_overall" }
+  }},
+  { $sort: { avg_overall: -1 } }
+]);
+
+
+
+
+
+//Пронађи најчешће коришћене речи у коментарима рецензија у оквиру којих је целокупна оцена испод 2 00:00:698
+// bad bitter worst mouthfeel
+config.set("displayBatchSize",1000)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      review_overall: { $lt: 2 } 
+    }
+  },
+  {
+    $project: {
+      words: { $split: ["$review_text", " "] }
+    }
+  },
+  {
+    $unwind: "$words" 
+  },
+  {
+    $group: {
+      _id: "$words",
+      count: { $sum: 1 } 
+    }
+  },
+  {
+    $sort: { count: -1 } 
+  },
+  {
+    $limit: 1000
+  }
+]);
+
+
+
+
+// Пронађи пиво са коментарима које садржи највише речи из скупа  { "good" ,"fine" ,"perfect", "tastefull" }, прикажи пронађен број 00:28:541
+config.set("displayBatchSize", 300)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      review_text: { $exists: true, $ne: null }
+    }
+  },
+  {
+    $project: {
+      beer_name: 1,
+      review_text: 1,
+      words: { $split: ["$review_text", " "] } 
+    }
+  },
+  {
+    $unwind: "$words" // Razdvajanje reči na pojedinačne dokumente
+  },
+  {
+    $match: {
+      words: { $in: ["good", "fine", "perfect", "tasteful"] }
+    }
+  },
+  {
+    $group: {
+      _id: "$beer_name",
+      word_count: { $sum: 1 } 
+    }
+  },
+  {
+    $sort: { word_count: -1 } 
+  },
+  {
+    $limit: 1
+  },
+  {
+    $project: {
+      _id: 0,
+      beer_name: "$_id",
+      word_count: 1
+    }
+  }
+]).pretty()
+
+
+
+
+
+// Пронађи три особе које су дале просечно најлошије оцене, а имају их бар 5, сортирај по пронађеним просечним оценама 00:00:711
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $group: {
+      _id: "$review_profileName",
+      avg_review_overall: { $avg: "$review_overall" },
+      review_count: { $sum: 1 } 
+    }
+  },
+  {
+    $match: {
+      review_count: { $gte: 5 } 
+    }
+  },
+  {
+    $sort: { avg_review_overall: 1 } 
+  },
+  {
+    $limit: 3
+  },
+  {
+    $project: {
+      _id: 0,
+      profileName: "$_id",
+      avg_review_overall: 1, 
+      review_count: 1 
+    }
+  }
+]).pretty();
+
+
+
+// За пива са нивоом алкохола преко 7% пронађи како им се кретала просечна оцена по годинама, сортирај по годинама 00:00:917
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      beer_ABV: { $gt: 7 } 
+    }
+  },
+  {
+    $project: {
+      year: { $year: { $toDate: { $multiply: ["$review_time", 1000] } } }, 
+      review_overall: 1 
+    }
+  },
+  {
+    $group: {
+      _id: "$year", 
+      avg_review_overall: { $avg: "$review_overall" } 
+    }
+  },
+  {
+    $sort: { _id: 1 } 
+  },
+  {
+    $project: {
+      _id: 0,
+      year: "$_id",
+      avg_review_overall: 1 
+    }
+  }
+]).pretty();
+
+
+
+// ​Израчунај просечнe оценe пива, груписане по нивоима алкохола 00:01:449
+// ovo bi bilo dobro da se nacrta posle
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      beer_ABV: { $ne: null } 
+    }
+  },
+  {
+    $project: {
+      beer_ABV: { $round: [{ $toDouble: "$beer_ABV" }, 1] }, 
+      review_overall: 1
+    }
+  },
+  {
+    $group: {
+      _id: "$beer_ABV", 
+      avg_review_overall: { $avg: "$review_overall" } 
+    }
+  },
+  {
+    $sort: { _id: 1 } 
+  },
+  {
+    $group: {
+      _id: null,
+      results: { $push: { beer_ABV: "$_id", avg_review_overall: "$avg_review_overall" } }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      results: 1
+    }
+  },
+  {
+    $unwind: "$results"
+  },
+  {
+    $replaceRoot: { newRoot: "$results" }
+  }
+])
+
+
+
+// просечан ниво алкохола по стиловима пива 00:00:785
+config.set("displayBatchSize",300)
+db.SBP_Kol.aggregate([
+  {
+    $match: {
+      beer_style: { $ne: null },
+      beer_ABV: { $gte: 0 } 
+    }
+  },
+  {
+    $group: {
+      _id: "$beer_style",
+      count: { $sum: 1 },
+      avg_ABV: { $avg: "$beer_ABV" } 
+    }
+  },
+  {
+    $sort: { count: -1 } 
+  },
+  {
+    $project: {
+      _id: 0,
+      beer_style: "$_id",
+      count: 1,
+      avg_ABV: { $round: ["$avg_ABV", 1] }
+    }
+  }
+]).pretty();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
